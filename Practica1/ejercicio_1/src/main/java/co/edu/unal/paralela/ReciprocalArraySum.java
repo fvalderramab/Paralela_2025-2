@@ -181,32 +181,30 @@ public final class ReciprocalArraySum {
      */
     protected static double parManyTaskArraySum(final double[] input,
             final int numTasks) {
-
-        // Crear un pool de hilos
-        java.util.concurrent.ForkJoinPool pool = new java.util.concurrent.ForkJoinPool();
-
-        // Crear un arreglo para las tareas
-        java.util.List<ReciprocalArraySumTask> tasks = new java.util.ArrayList<>();
-
+        // Crear tareas y usar el pool común de ForkJoin
+        ReciprocalArraySumTask[] tasks = new ReciprocalArraySumTask[numTasks];
+    
         // Crear una tarea por cada chunk del arreglo
         for (int i = 0; i < numTasks; i++) {
             int start = getChunkStartInclusive(i, numTasks, input.length);
             int end = getChunkEndExclusive(i, numTasks, input.length);
             // Agregar la tarea a la lista
-            tasks.add(new ReciprocalArraySumTask(start, end, input));
+            tasks[i] = new ReciprocalArraySumTask(start, end, input);
         }
 
-        // Enviar todas las tareas al pool para que se ejecuten en paralelo
-        for (ReciprocalArraySumTask task : tasks) {
-            pool.execute(task);
+        // Fork todas las tareas excepto la primera (que se ejecutará en el hilo actual)
+        for (int i = 1; i < numTasks; i++) {
+            tasks[i].fork();
         }
+
+        // Ejecutar la primera tarea en el hilo actual
+        tasks[0].compute();
 
         // Esperar a que todas las tareas terminen y sumar sus resultados
-        double sum = 0;
-
-        for (ReciprocalArraySumTask task : tasks) {
-            task.join(); // Esperar a que la tarea termine
-            sum += task.getValue(); // Sumar el valor calculado por la tarea
+        double sum = tasks[0].getValue();
+        for (int i = 1; i < numTasks; i++) {
+            tasks[i].join();
+            sum += tasks[i].getValue();
         }
         
         return sum;
